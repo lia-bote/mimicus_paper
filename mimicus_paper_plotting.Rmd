@@ -1,0 +1,588 @@
+---
+title: "Plotting scripts for V. mimicus paper"
+output: html_document
+date: "2026-06-11"
+---
+Load required libraries, including most recent version of ggplot2 
+
+```{r load required libraries, warning = F, results = 'hide', error = F, message = F}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+library(tidyverse)
+library(ggplot2)
+library(tidyverse)
+library(svglite)
+library(cowplot)
+library(ggtree)
+library(phytools)
+library(ggtreeExtra)
+library(ggnewscale)
+library(aplot)
+library(paletteer)
+```
+
+Read phylogenetic tree nwk file and all associated metadata 
+``` {r read tree and metadata}
+# read tree 
+mimicus_tree <- read.tree("iqtree_mimicus_contree.nwk")
+# root on most basal genome/ most closely related to metoecus 
+rooted_tree <- root(mimicus_tree, outgroup = "GCA_000176415.1_ASM17641v1_genomic", resolve.root = TRUE)
+
+# rename tree tips 
+## function to remove extra bits of name 
+simplify_label <- function(label) {
+  sub("^([A-Z]{3}_[0-9]+\\.[0-9]+).*", "\\1", label)
+}
+## rename tips 
+rooted_tree$tip.label <- sapply(rooted_tree$tip.label, simplify_label)
+
+# visualise rooted tree
+p <- ggtree(rooted_tree)
+
+# read baps partitions
+## fastbaps was run on cluster with optimise.baps as prior and using phylogeny
+optimise.baps <- read_table("mimicus_n161_baps_optimise_baps.tsv")
+optimise.baps <- optimise.baps[,1:2]
+## rename sample ids and col headers
+optimise.baps[1] <- sapply(optimise.baps[1], simplify_label)
+names(optimise.baps) <- c("id", "level")
+
+# read in metadata for public mimicus genomes 
+mimicus_metadata <- read.csv("mimicus_metadata_v4.csv")
+rownames(mimicus_metadata) <- mimicus_metadata$id
+mimicus_metadata <- mimicus_metadata[,-(2)]
+## NAs for missing values 
+mimicus_metadata[mimicus_metadata == ""] <- NA
+mimicus_metadata[mimicus_metadata == "not collected"] <- NA
+
+# merge metadata and BAPS cluster for all mimicus genomes (n = 161)
+mimicus_metadata_baps <- merge(optimise.baps, mimicus_metadata)
+
+# read abricate - CARD
+mimicus_card <- data.frame(read_table("mimicus_summary_card.tsv"))
+rownames(mimicus_card) <- mimicus_card$FILE
+mimicus_card <- mimicus_card[, -1]
+rownames(mimicus_card) <- sapply(rownames(mimicus_card), simplify_label)
+## pivot longer for heatmap plotting 
+mimicus_card_long <- mimicus_card %>%
+  as.data.frame() %>%
+  rownames_to_column("id") %>%
+  pivot_longer(
+    cols = -id,
+    names_to = "gene",
+    values_to = "presence"
+  )
+
+# read abricate - VFDB 
+mimicus_vfdb <- read.csv("mimicus_n161_abricate_vfdb_plotting.csv")
+rownames(mimicus_vfdb) <- mimicus_vfdb$X_FILE
+mimicus_vfdb <- mimicus_vfdb[, -1]
+rownames(mimicus_vfdb) <- sapply(rownames(mimicus_vfdb), simplify_label)
+## pivot longer for heatmap plotting 
+mimicus_vfdb_long <- mimicus_vfdb %>%
+  as.data.frame() %>%
+  rownames_to_column("id") %>%
+  pivot_longer(
+    cols = -id,
+    names_to = "gene",
+    values_to = "presence"
+  )
+
+# get tip coordinates to mark tips of samples from this study 
+tip_coords <- p$data %>%
+  filter(isTip) %>%
+  select(label, x, y)
+names(tip_coords) <- c("id", "xcoord", "ycoord")
+## merge with metadata 
+mimicus_metadata_baps_tips <- left_join(tip_coords, mimicus_metadata_baps, by = "id")
+
+## ctxB allele data 
+mimicus_ctxB_alleles <- read_table("mimicus_ctxB_alleles_assigned.tsv")
+mimicus_ctxB_alleles$id <- sapply(mimicus_ctxB_alleles$id, simplify_label)
+
+mimicus_metadata_baps_tips <- merge(mimicus_ctxB_alleles, mimicus_metadata_baps_tips, by = "id", all.y = T)
+
+## bangladesh genomes province 
+mimicus_province <- read_csv("mimicus_bangladesh_state.csv")
+mimicus_metadata_baps_tips_province <- merge(mimicus_province, mimicus_metadata_baps_tips, by = "id", all.y = T)
+
+# colours for plotting
+baps_colours <- c("1" = "#FBE183", "2" = "#F4C40F", "3" = "#FE9B00", "4" = "#D8443C", "5" = "#9B3441", "6" = "#DE597C", "7"= "#E87B89", "8" = "#E6A2A6", "9" = "#AA7AA1", "10" = "#9F5691", "11" = "#633372", "12" = "#1F6E9C", "13" = "#2B9B81", "14" = "#92C051", "15" = "#72874E", "16" = "#A08018", "17" = "#307808", "18" = "#484880", "19"= "#68A8E0", "20" = "#CD8A56", "21" = "#FF1494", "22" = "#417BA1")
+
+```
+
+Get node ID for MRCA in each BAPS lineage as defined above
+``` {r get node for MRCA for each lineage}
+
+### get tip names per node per baps level
+
+node_l1_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 1,]$id
+node_l1 <- MRCA(p, node_l1_tips)
+
+node_l2_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 2,]$id
+node_l2 <- MRCA(p, node_l2_tips)
+
+node_l3_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 3,]$id
+node_l3 <- MRCA(p, node_l3_tips)
+
+node_l4_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 4,]$id
+node_l4 <- MRCA(p, node_l4_tips)
+
+node_l5_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 5,]$id
+node_l5 <- MRCA(p, node_l5_tips)
+
+node_l6_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 6,]$id
+node_l6 <- MRCA(p, node_l6_tips)
+
+node_l7_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 7,]$id
+node_l7 <- MRCA(p, node_l7_tips)
+
+node_l8_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 8,]$id
+node_l8 <- MRCA(p, node_l8_tips)
+
+node_l9_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 9,]$id
+node_l9 <- MRCA(p, node_l9_tips)
+
+node_l10_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 10,]$id
+node_l10 <- MRCA(p, node_l10_tips)
+
+node_l11_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 11,]$id
+node_l11 <- MRCA(p, node_l11_tips)
+
+node_l12_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 12,]$id
+node_l12 <- MRCA(p, node_l12_tips)
+
+node_l13_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 13,]$id
+node_l13 <- MRCA(p, node_l13_tips)
+
+node_l14_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 14,]$id
+node_l14 <- MRCA(p, node_l14_tips)
+
+node_l15_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 15,]$id
+node_l15 <- MRCA(p, node_l15_tips)
+
+node_l16_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 16,]$id
+node_l16 <- MRCA(p, node_l16_tips)
+
+node_l17_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 17,]$id
+node_l17 <- MRCA(p, node_l17_tips)
+
+node_l18_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 18,]$id
+node_l18 <- MRCA(p, node_l18_tips)
+
+node_l19_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 19,]$id
+node_l19 <- MRCA(p, node_l19_tips)
+
+node_l20_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 20,]$id
+node_l20 <- MRCA(p, node_l20_tips)
+
+node_l21_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 21,]$id
+node_l21 <- MRCA(p, node_l21_tips)
+
+node_l22_tips <- mimicus_metadata_baps_tips[mimicus_metadata_baps_tips$level == 22,]$id
+node_l22 <- MRCA(p, node_l22_tips)
+
+## make data frame of tip labels per node
+
+df_n1 <- data.frame(node_l1_tips, node_l1)
+names(df_n1) <- c("id", "clade_node")
+
+df_n2 <- data.frame(node_l2_tips, node_l2)
+names(df_n2) <- c("id", "clade_node")
+
+df_n3 <- data.frame(node_l3_tips, node_l3)
+names(df_n3) <- c("id", "clade_node")
+
+df_n4 <- data.frame(node_l4_tips, node_l4)
+names(df_n4) <- c("id", "clade_node")
+
+df_n5 <- data.frame(node_l5_tips, node_l5)
+names(df_n5) <- c("id", "clade_node")
+
+df_n6 <- data.frame(node_l6_tips, node_l6)
+names(df_n6) <- c("id", "clade_node")
+
+df_n7 <- data.frame(node_l7_tips, node_l7)
+names(df_n7) <- c("id", "clade_node")
+
+df_n8 <- data.frame(node_l8_tips, node_l8)
+names(df_n8) <- c("id", "clade_node")
+
+df_n9 <- data.frame(node_l9_tips, node_l9)
+names(df_n9) <- c("id", "clade_node")
+
+df_n10 <- data.frame(node_l10_tips, node_l10)
+names(df_n10) <- c("id", "clade_node")
+
+df_n11 <- data.frame(node_l11_tips, node_l11)
+names(df_n11) <- c("id", "clade_node")
+
+df_n12 <- data.frame(node_l12_tips, node_l12)
+names(df_n12) <- c("id", "clade_node")
+
+df_n13 <- data.frame(node_l13_tips, node_l13)
+names(df_n13) <- c("id", "clade_node")
+
+df_n14 <- data.frame(node_l14_tips, node_l14)
+names(df_n14) <- c("id", "clade_node")
+
+df_n15 <- data.frame(node_l15_tips, node_l15)
+names(df_n15) <- c("id", "clade_node")
+
+df_n16 <- data.frame(node_l16_tips, node_l16)
+names(df_n16) <- c("id", "clade_node")
+
+df_n17 <- data.frame(node_l17_tips, node_l17)
+names(df_n17) <- c("id", "clade_node")
+
+df_n18 <- data.frame(node_l18_tips, node_l18)
+names(df_n18) <- c("id", "clade_node")
+
+df_n19 <- data.frame(node_l19_tips, node_l19)
+names(df_n19) <- c("id", "clade_node")
+
+df_n20 <- data.frame(node_l20_tips, node_l20)
+names(df_n20) <- c("id", "clade_node")
+
+df_n21 <- data.frame(node_l21_tips, node_l21)
+names(df_n21) <- c("id", "clade_node")
+
+df_n22 <- data.frame(node_l22_tips, node_l22)
+names(df_n22) <- c("id", "clade_node")
+
+clade_nodes <-rbind(df_n1, df_n2, df_n3, df_n4, df_n5, df_n6,
+      df_n7, df_n8, df_n9, df_n10, df_n11, df_n12,
+      df_n13, df_n14, df_n15, df_n16, df_n17, df_n18, 
+      df_n19, df_n20, df_n21, df_n22)
+
+mimicus_metadata_baps_tips <- merge(clade_nodes, mimicus_metadata_baps_tips, by = "id")
+
+```
+
+Plot phylogenetic tree with clades coloured by BAPS cluster
+``` {r highlight clades}
+# add column for colour based on baps cluster
+mimicus_metadata_baps_tips$fill_col <-
+  baps_colours[as.character(mimicus_metadata_baps_tips$level)]
+
+# plot tree and colour by baps cluster 
+p0 <- p + geom_hilight(node = mimicus_metadata_baps_tips$clade_node, fill = mimicus_metadata_baps_tips$fill_col, extendto = 0.29, alpha = 0.1, colour =  mimicus_metadata_baps_tips$fill_col) + geom_tree() +  geom_treescale(x=0, y=35)
+
+legend_df <- mimicus_metadata_baps_tips %>%
+  distinct(level, fill_col)
+```
+
+Add all sample metadata to tree (region, year, source of isolation)
+``` {r plot tree with all metadata}
+########
+#plot tree and BAPS clusters 
+mimicus_metadata_baps_tips$fill_col <-
+  baps_colours[as.character(mimicus_metadata_baps_tips$level)]
+
+# p + geom_hilight(node = mimicus_metadata_baps_tips$clade_node, 
+#                  fill = mimicus_metadata_baps_tips$fill_col, 
+#                  extendto = 0.29, alpha = 0.15) + 
+p2 <- p0 + 
+  geom_fruit(
+  data = mimicus_metadata_baps_tips,
+  geom = geom_tile,
+  mapping = aes(y = id, fill = factor(level)),
+  width = 0.02,
+  offset = 0.05) +
+  scale_fill_manual(values = baps_colours, name = "BAPS cluster") +
+# add column for year
+  new_scale_fill() +
+  geom_fruit(
+    data = mimicus_metadata_baps_tips,
+    geom = geom_tile,
+    mapping = aes(y = id, fill = as.numeric(year)),
+    width = 0.02,
+    offset = 0.08
+  ) +
+  scale_fill_continuous(low="thistle2", high="darkred",
+                      na.value="white", guide = "colorbar", name = "Year") +
+  guides(file = guide_colorbar(order = 2,
+                               label.theme = element_text(angle = 90))) +
+# add column for location
+  new_scale_fill() +
+  geom_fruit(
+    data = mimicus_metadata_baps_tips,
+    geom = geom_tile,
+    mapping = aes(y = id, fill = loc),
+    width = 0.02,
+    offset = 0.08) +
+  scale_fill_brewer(palette = "Set2", name = "Location", guide = guide_legend(order = 3)) +
+# add column for source of isolation
+  new_scale_fill() +
+  geom_fruit(
+    data = mimicus_metadata_baps_tips,
+    geom = geom_tile,
+    mapping = aes(y = id, fill = source2),
+    width = 0.02,
+    offset = 0.08
+  ) +
+  scale_fill_brewer(palette = "Set1", name = "Source", guide = guide_legend(order = 4)) +
+# mark tips from this study
+  geom_point(
+    data = mimicus_metadata_baps_tips %>% filter(study == "this_study"),
+    aes(x = xcoord, y = ycoord),
+    shape = 19,   # star
+    size = 3,
+    color = "blue"
+  ) 
+
+p2
+```
+
+Add presence/absence of AMR and virulence genes to tree 
+``` {r plot AMR and virulence genes}
+
+mimicus_vfdb_long$gene <- factor(mimicus_vfdb_long$gene, levels = unique(mimicus_vfdb_long$gene))
+
+#### add presence/ absence of vf genes
+p3 <- p2 + new_scale_fill() +
+  geom_fruit(
+    data = mimicus_vfdb_long, 
+    geom = geom_tile,
+    colour = "gray",
+    mapping = aes(x = gene, y = id, fill = presence),
+    offset = 0.1, 
+    pwidth = 1,
+    axis.params=list(axis="x",
+                     text.angle = 90,
+                     text.size = 4,
+                     line.size = 0,
+                     hjust = 1   
+                     )) + 
+    scale_fill_manual(values=c("#f5af4d", "#1a318b"), name = "VF", guide = guide_legend(order = 5)) + 
+    guides(
+    fill = guide_legend(nrow = 4, byrow = TRUE)  # number of rows in the legend keys
+  ) + new_scale_fill() +
+#### add presence/ absence of amr genes
+  geom_fruit(
+    data = mimicus_card_long, 
+    geom = geom_tile,
+    colour = "gray",
+    mapping = aes(x = gene, y = id, fill = presence),
+    offset = 0.1,
+    pwidth = 0.1,
+    axis.params=list(axis="x",
+                     text.angle = 90,
+                     text.size = 4,
+                     line.size = 0,
+                     hjust = 1   
+                     )) + 
+    scale_fill_manual(values=c("#f5af4d", "#1a318b"), name = "AMR", guide = guide_legend(order = 6)) + 
+  theme(legend.position = "bottom",
+     legend.direction = "horizontal",
+     legend.box = "horizontal") + 
+ylim(-20, 165)
+
+
+p3
+```
+
+Generate gene maps and synteny plots for cholera toxin phage found in _V. mimicus_ genomes
+``` {r plot gene maps and synteny links for ctx phage}
+## install version of ggplot2 compatible with gggenomes
+remotes::install_version("ggplot2", "3.5.2", repos = "http://cran.us.r-project.org")
+library(gggenomes)
+
+### seqs 
+ctx_mim_fna <- read_seqs("mimicus_ctx_all.fasta")
+
+### genes
+ctx_mim_gff1 <- read_feats("mimicus_ctx_all_half1.gff3")
+ctx_mim_gff2 <- read_feats("mimicus_ctx_all_half2.gff3")
+ctx_mim_gff <- bind_rows(ctx_mim_gff1, ctx_mim_gff2)
+
+ctx_mim_gff_norm <- ctx_mim_gff %>%
+  group_by(file_id, seq_id) %>%              # normalize separately for each sequence
+  mutate(
+    offset = min(start),                     # find the first coordinate
+    start = start - offset + 1,               # shift start
+    end   = end   - offset + 1                # shift end
+  ) %>%
+  ungroup() %>%
+  select(-offset)
+
+
+ctx_mim_gff_norm$file_id <- c("mimicus_ctx_all")
+
+### links
+ctx_mim_tbl <- read_table("ctx_blast_all.out")
+ctx_mim_links <- tibble::tibble(
+  seq_id = c(ctx_mim_tbl$seq_id),
+  start = c(ctx_mim_tbl$start), 
+  end = (c(ctx_mim_tbl$end)), 
+  seq_id2 = c(ctx_mim_tbl$seq_id2),
+  start2 = c(ctx_mim_tbl$start2),
+  end2 = c(ctx_mim_tbl$end2),
+  percent_identity = c(ctx_mim_tbl$pident)
+)
+
+### ctx phi genes colours for plotting 
+colours_ctx <- c(
+  "ace" = "#FFEC9D", 
+  "zot" = "gold",
+  "cep" = "#B9DBF1", 
+  
+  "ctxA" = "#FF9898",
+  "ctxB" = "#D9636C",
+  
+  "nicK" = "#E6EE9C",
+  
+  "rstA" = "#E6EE9C",
+  "rstB" = "#C0CA33",
+  "rstB2" = "#C0CA33",
+  "rstC" = "#C0CA33",
+  "rstR" = "#9E9D24") 
+
+### plot gene maps and synteny links
+plot_ctx <- gggenomes(
+    genes = ctx_mim_gff_norm, 
+    seqs = ctx_mim_fna,
+    links = ctx_mim_links
+) +
+  geom_seq() +
+  # First fill scale for links
+  geom_link(aes(fill = percent_identity), stat = "identity", colour = NA) +
+  scale_fill_gradient2(low = "#ff8200", midpoint = 97, mid = "#f6eb26", high = "#00008b") + 
+  ggnewscale::new_scale_fill() +
+  # Second fill scale for genes
+  geom_gene(aes(fill = gene), size = 8) +
+  scale_fill_manual(values = colours_ctx, na.value="#FFFEEA") +
+  geom_bin_label(hjust = 1, size = 5)
+
+# plot all in same orientation 
+plot_ctx_flip <- plot_ctx %>%
+  sync()
+
+plot_ctx_flip2 <- plot_ctx_flip$data$feats$genes
+
+# align by gene ace
+ace <- plot_ctx_flip2 %>%
+  filter(gene == "ace") %>%
+  group_by(bin_id) %>%
+  slice_head(n = 1)
+
+ctx_gggenomes <- plot_ctx_flip %>%
+  gggenomes::shift(all_of(ace$seq_id), by = -ace$x) 
+
+# order by phylogeny 
+ctx_gggenomes_ordered <- ctx_gggenomes %>% gggenomes::pick("GCA_000175995.1", "GCA_963861715.1", "GCA_001471395.2", "GCA_963870535.1", "GCA_000222145.1", "GCA_963861235.1", "GCA_041015405.1", "GCA_041016145.1", "GCA_041015965.1", "GCA_041016025.1", "GCA_041015365.1", "GCA_963886345.1", "GCA_009764005.1", "GCA_041015925.1", "GCA_041015885.1", "GCA_963889215.1", "GCA_014525095.1", "GCA_041015545.1", "GCA_009665195.1", "GCA_963886145.1", "GCA_041015705.1", "GCA_041016005.1")
+
+ctx_gggenomes_ordered
+
+```
+
+
+Generate gene maps and synteny plots for TCP operon found in _V. mimicus_ genomes
+``` {r plot gene maps and synteny links for tcp operon}
+#read fasta 
+vpi1_mim_fna <- read_seqs("vpi-1_region_all.fasta")
+
+#remove sequences with overlapping gene annotations 
+vpi1_mim_fna <- vpi1_mim_fna[!grepl("GCA_001471395.2", vpi1_mim_fna$seq_id),]
+vpi1_mim_fna <- vpi1_mim_fna[!grepl("GCA_963861715.1", vpi1_mim_fna$seq_id),]
+vpi1_mim_fna <- vpi1_mim_fna[!grepl("GCA_041015705.1", vpi1_mim_fna$seq_id),]
+
+#read gffs and merge, normalise 
+vpi1_mim_gff1 <- read_feats("vpi-1_gffs_n1.gff3")
+vpi1_mim_gff1[vpi1_mim_gff1$seq_id == "9",]$seq_id = "48638_1#152"
+vpi1_mim_gff2 <- read_feats("vpi-1_gffs_n2.gff3")
+vpi1_mim_gff3 <- read_feats("vpi-1_gffs_n3.gff3")
+vpi1_mim_gff4 <- read_feats("vpi-1_gffs_n4.gff3")
+
+
+vpi1_mim_gff <- bind_rows(vpi1_mim_gff1, vpi1_mim_gff2, vpi1_mim_gff3, vpi1_mim_gff4)
+
+vpi1_mim_gff_norm <- vpi1_mim_gff %>%
+  group_by(file_id, seq_id) %>%              # normalize separately for each sequence
+  mutate(
+    offset = min(start),                     # find the first coordinate
+    start = start - offset + 1,               # shift start
+    end   = end   - offset + 1                # shift end
+  ) %>%
+  ungroup() %>%
+  select(-offset)
+
+### links
+vpi1_mim_tbl <- read_table("vpi-1_blast_all_v_all.out")
+
+vpi1_mim_links <- tibble::tibble(
+  seq_id = c(vpi1_mim_tbl$seq_id),
+  start = c(vpi1_mim_tbl$start), 
+  end = (c(vpi1_mim_tbl$end)), 
+  seq_id2 = c(vpi1_mim_tbl$seq_id2),
+  start2 = c(vpi1_mim_tbl$start2),
+  end2 = c(vpi1_mim_tbl$end2),
+  percent_identity = c(vpi1_mim_tbl$pident)
+)
+
+#####
+#### plot colours 
+
+colours <- c(
+  "acfA" = "#B4D9CC", 
+  "acfB" = "#89C0B6", 
+  "acfC" = "#448C8A",
+  "acfD" = "#235D72",
+  
+  "tcpA" = "#ADB17D",
+  "tcpP" = "#767676",
+  "tcpH" = "#FFB547",
+  "tcpB" = "#800000",
+  "tcpQ" = "#5B8FA8",
+  "tcpC" = "#D49464",
+  "tcpR" = "#B1746F",
+  "tcpD" = "#8A8B79",
+  "tcpS" = "#725663",
+  "tcpT" = "#919C4C",
+  "tcpE" = "#9C9EDE",
+  "tcpF" = "#FD8F24",
+  "tcpN" = "#F5C04A",
+  "tcpJ" = "#E68C7C",
+  "ssrA" = "#FF5A5A",
+  
+  "NA" = "#FFFEEA",
+  
+  "aldA" = "#F3CBD3",
+  "nlpD" = "#EAA9BD",
+  "tagA" = "#DD88AC",
+  "tarA" = "#CA699D",
+  "tpx" = "#B14D8E",
+  "yckC" = "#91357D") 
+#####
+
+### plot 
+plot_vpi1 <- gggenomes(genes = vpi1_mim_gff_norm, 
+          seqs = vpi1_mim_fna, 
+          links = vpi1_mim_links) + 
+  geom_seq() +
+  geom_link(aes(fill = percent_identity), stat = "identity", colour = NA) +
+  scale_fill_gradient2(low = "#ff8200", midpoint = 98, mid = "#f6eb26", high = "#00008b") +
+  ggnewscale::new_scale_fill() +
+  geom_gene(aes(fill = gene), size = 8) +
+  scale_fill_manual(values = colours, na.value="#FFFEEA") + 
+  #geom_gene_tag(aes(label = gene), vjust = -2, size = 3) +
+  geom_bin_label(hjust = 1, size = 5)
+
+
+plot_vpi1_flip <- plot_vpi1 %>%
+  sync()
+
+plot_vpi1_flip2 <- plot_vpi1_flip$data$feats$genes
+
+tcpB <- plot_vpi1_flip2 %>%
+  filter(gene == "tcpB") %>%
+  group_by(bin_id) %>%
+  slice_head(n = 1)
+
+tcp_gggenomes <- plot_vpi1_flip %>%
+  gggenomes::shift(all_of(tcpB$seq_id), by = -tcpB$x)  
+
+tcp_gggenomes_ordered <- tcp_gggenomes %>% gggenomes::pick("GCA_036553415.1", "48638_1#152", "GCA_963870535.1", "GCA_000736955.1", "GCA_000175995.1", "GCA_000222145.1", "GCA_963861235.1", "GCA_041016145.1", "GCA_041016025.1", "GCA_963886345.1", "GCA_009764005.1", "GCA_041015885.1", "GCA_009665195.1", "GCA_963886145.1", "GCA_041015545.1")
+
+tcp_gggenomes_ordered               
+```
