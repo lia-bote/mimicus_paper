@@ -58,8 +58,7 @@ Example code used for the command-line analyses are below:
 ### for combining QC output and generating interactive ooutput files 
 `multiqc --outdir multiqc_output --interactive fastqc_output`
 
-### for taxonomic prediction from reads
-### using the kraken standard database
+### for taxonomic prediction from reads using the kraken standard database
 `kraken2 --db /data/pam/software/kraken2/standard/k2_standard_20250402/ --use-names --report 48538_1#370.kreport --output 48538_1#370.kraken 48538_1#370_1.fastq 48538_1#370_2.fastq`
 
 
@@ -79,14 +78,14 @@ Example code used for the command-line analyses are below:
 
 ### for generating a pangenome with a core gene alignment 
 `panaroo -t 16 -i gff3_fna_files.txt -o panaroo_mimicus --clean-mode strict --remove-invalid-genes -a core --merge_paralogs`
-### run time ~2.5 days with 60 max threads and 5Gb memory
+run time ~2.5 days with 60 max threads and 5Gb memory
 
 ### for generating a maximum-likelihood phylogenetic tree based on SNPs 
 ### extract SNP sites only
 `snp-sites -o snp-sites.fasta panaroo_mimicus/core_gene_alignment_filtered.aln`
 ### generate a maximum-likelihood tree with specified model and 1000 ultrafast boostraps 
 `iqtree -s snp-sites.out --prefix iqtree_out -T AUTO -m GTR+F+R10 -B 1000`
-##### run time ~5 days with 60 max threads and 20Gb memory 
+run time ~5 days with 60 max threads and 20Gb memory 
 
 ### for finding virulence/AMR genes in assemblies
 ### for virulence genes with VF database
