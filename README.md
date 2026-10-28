@@ -1,6 +1,11 @@
-Code and analysis for Genome dynamics of <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh
+#Genome dynamics of environmental <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh
 
-This document describes the command-line analyses performed as part of this study, with example code for each stage showing which flags were used. Sequencing reads from this study corresponding to these examples are found in DOI:10.6084/m9.figshare.32664414. The output files/directories generated with each command, highlighting expected output, and described in the comments accompanying each line of code. Comments are also included with approximate run times for key stages of the analyses.
+##Overview
+
+This repository contains analysis scripts for the study 'Genome dynamics of environmental <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh'. Sequencing reads from this study corresponding to these examples are found in DOI:10.6084/m9.figshare.32664414 and in BioProject PRJEB116021.
+
+
+The output files/directories generated with each command, highlighting expected output, and described in the comments accompanying each line of code. Comments are also included with approximate run times for key stages of the analyses.
 
 The software used, with corresponding versions, are listed below. Examples of how these software were installed can be found in the R Notebook also included in this repository. These analyses can be run on a local computer or on a compute cluster, and no non-standard hardware were used. No other custom software was developed for this study. 
 
@@ -50,48 +55,7 @@ ggplot2_3.5.2
 ggplot2_4.0.0
 tidyverse_2.0.0 
 
-Example code used for the command-line analyses are below: 
 
-### for read QC: 
-`fastqc -o fastqc_output/ 48538_1#370_1.fastq 48538_1#370_2.fastq`
-
-### for combining QC output and generating interactive ooutput files 
-`multiqc --outdir multiqc_output --interactive fastqc_output`
-
-### for taxonomic prediction from reads using the kraken standard database
-`kraken2 --db /data/pam/software/kraken2/standard/k2_standard_20250402/ --use-names --report 48538_1#370.kreport --output 48538_1#370.kraken 48538_1#370_1.fastq 48538_1#370_2.fastq`
-
-
-### for genome assembly 
-`unicycler -1 48538_1#370_1.fastq.gz -2 48538_1#370_2.fastq.gz -o assembly_48538_1#370 --mode normal`
-
-### for investigating assembly QC 
-`quast.py -o quast_output_48538_1#370  assembly_48538_1#370/assembly.fasta`
-
-`checkm2 predict -i assembly_48538_1#370/assembly.fasta -o checkm2_48538_1#370 -x .fasta -t 24`
-
-### for taxonomic assignment based on assembly 
-`gtdbtk classify_wf --batchfile list_of_fastas.txt --out_dir gtdb_tax_out --mash_db mashdb`
-
-### for annotation of genome assemblies
-`bakta --output bakta_output_directory/bakta_48538_1#370 --prefix 48538_1#370 --compliant --skip-plot --threads 16 --keep-contig-headers assembly_48538_1#370/assembly.fasta`
-
-### for generating a pangenome with a core gene alignment 
-`panaroo -t 16 -i gff3_fna_files.txt -o panaroo_mimicus --clean-mode strict --remove-invalid-genes -a core --merge_paralogs`
-run time ~2.5 days with 60 max threads and 5Gb memory
-
-### for generating a maximum-likelihood phylogenetic tree based on SNPs 
-### extract SNP sites only
-`snp-sites -o snp-sites.fasta panaroo_mimicus/core_gene_alignment_filtered.aln`
-### generate a maximum-likelihood tree with specified model and 1000 ultrafast boostraps 
-`iqtree -s snp-sites.out --prefix iqtree_out -T AUTO -m GTR+F+R10 -B 1000`
-run time ~5 days with 60 max threads and 20Gb memory 
-
-### for finding virulence/AMR genes in assemblies
-### for virulence genes with VF database
-`abricate --db vfdb --quiet assembly_48538_1#370/assembly.fasta`
-### for AMR genes with CAR database
-`abricate --db card --quiet assembly_48538_1#370/assembly.fasta`
 #### codeml ctl file for running PAML to estimate dN/dS
 `seqfile = clustalw_nuc_aln.fasta            * Path to the alignment file
      treefile = tcpA_codon_rename_no_len.tree           * Path to the tree file
