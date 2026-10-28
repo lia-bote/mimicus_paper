@@ -1,6 +1,6 @@
-#Genome dynamics of environmental <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh
+#Genome dynamics of environmental <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh#
 
-##Overview
+##Overview##
 
 This repository contains analysis scripts for the study 'Genome dynamics of environmental <i>Vibrio mimicus</i> in cholera-endemic regions of Bangladesh'. Sequencing reads from this study corresponding to these examples are found in DOI:10.6084/m9.figshare.32664414 and in BioProject PRJEB116021.
 
