@@ -6,13 +6,13 @@ This repository contains analysis scripts for the study 'Genome dynamics of envi
 
 ## Repository contents 
 `example_command_line_analyses.txt`
-Sample command line scripts for analyses steps in this study. The output files generated with each command are described in the comments accompanying each line of code. Comments are also included with approximate run times for key stages of the analyses.
+> Sample command line scripts for analyses steps in this study. The output files generated with each command are described in the comments accompanying each line of code. Comments are also included with approximate run times for key stages of the analyses.
 
 `codeml.ctl`
-Control file for dN/dS analysis implemented with CODEML.
+> Control file for dN/dS analysis implemented with CODEML.
 
 `mimicus_paper_plotting.Rmd`
-Scripts for downstream data processing and visualisation, performed on RStudio (Rv4.5.0). 
+> Scripts for downstream data processing and visualisation, performed on RStudio (Rv4.5.0). 
 
 ## Software 
 The software used, with corresponding versions, are listed below. 
@@ -61,6 +61,3 @@ Examples of how these software were installed can be found in the R Notebook als
 * ggplot2 v3.5.2
 * ggplot2 v4.0.0
 * tidyverse v2.0.0 
-
-
-        omega = 0.5        * Initial or fixed omega`
