@@ -12,7 +12,10 @@ This repository contains analysis scripts for the study 'Genome dynamics of envi
 > Control file for dN/dS analysis implemented with CODEML.
 
 `mimicus_paper_plotting.Rmd`
-> Scripts for downstream data processing and visualisation, performed on RStudio (Rv4.5.0). 
+> Scripts for downstream data processing and visualisation, performed on RStudio (Rv4.5.0).
+
+`mimicus_paper_plotting.html`
+> Results for plotting analyses with sample data and figures. The newick tree file and sample metadata used for these analyses are also included in this repository.   
 
 ## Software 
 The software used, with corresponding versions, are listed below. 
